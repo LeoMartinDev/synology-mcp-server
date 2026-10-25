@@ -1,0 +1,31 @@
+# Container Manager → Projet → Créer : chemin /docker/synology-mcp, « Créer docker-compose.yml »,
+# coller ce fichier et remplir les quatre valeurs marquées À REMPLIR. Détails : README, « Déployer sur le NAS ».
+services:
+  synology-mcp:
+    image: ghcr.io/leomartindev/synology-mcp-server:latest
+    container_name: synology-mcp
+    restart: unless-stopped
+    environment:
+      # Adresse publique du serveur, telle que configurée dans le proxy inversé de DSM (https, sans chemin)
+      SYNO_PUBLIC_URL: https://leomartin.synology.me:8443 # À REMPLIR
+      # Compte de service avec lequel les outils agissent (groupe administrators)
+      SYNO_USERNAME: MCP # À REMPLIR
+      SYNO_PASSWORD: "" # À REMPLIR
+      # Jeton d'appareil du compte de service, pour se passer du code 2FA (`bun run device-token <code>`)
+      SYNO_DEVICE_ID: "" # À REMPLIR
+      # DSM lui-même, joint sur l'hôte sans sortir du NAS ; son certificat n'est pas émis pour ce nom.
+      SYNO_URL: https://host.docker.internal:5001
+      SYNO_INSECURE_TLS: "true"
+      # Derrière le proxy inversé de DSM, qui transmet l'adresse du client dans X-Real-IP
+      SYNO_TRUST_PROXY: "true"
+      SYNO_AUDIT_LOG: /data/audit.log
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      # Seul le proxy inversé de DSM (HTTPS) y accède ; ne jamais exposer ce port directement.
+      - 127.0.0.1:8089:8080
+    volumes:
+      # permissions.yml (droits de chaque partie, à modifier), connexions OAuth, journal d'audit
+      - ./data:/data
+    security_opt:
+      - no-new-privileges:true

@@ -1,0 +1,6 @@
+# Only what the build stage needs (see Dockerfile).
+*
+!package.json
+!bun.lock
+!tsconfig.json
+!src
