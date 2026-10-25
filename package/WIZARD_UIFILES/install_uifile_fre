@@ -1,0 +1,64 @@
+[
+  {
+    "step_title": "Compte de service",
+    "items": [
+      {
+        "desc": "Synology MCP permet à Claude (claude.ai, Claude Code) de gérer ce NAS. Il agit sur DSM avec un compte dédié, membre du groupe <b>administrators</b> : créez-le d'abord dans Panneau de configuration → Utilisateur et groupe si ce n'est pas fait. Ce que Claude a le droit de faire se règle ensuite partie par partie dans l'application."
+      },
+      {
+        "type": "combobox",
+        "desc": "Compte DSM avec lequel le serveur agit :",
+        "subitems": [
+          {
+            "key": "wizard_username",
+            "desc": "Compte",
+            "displayField": "name",
+            "valueField": "name",
+            "editable": true,
+            "mode": "remote",
+            "api_store": {
+              "api": "SYNO.Core.User",
+              "method": "list",
+              "version": 1,
+              "baseParams": {
+                "offset": 0,
+                "limit": -1
+              },
+              "root": "users",
+              "idProperty": "name",
+              "fields": [
+                "name"
+              ]
+            },
+            "validator": {
+              "allowBlank": false
+            }
+          }
+        ]
+      },
+      {
+        "type": "password",
+        "subitems": [
+          {
+            "key": "wizard_password",
+            "desc": "Mot de passe",
+            "validator": {
+              "allowBlank": false
+            }
+          }
+        ]
+      },
+      {
+        "desc": "Si ce compte a la validation en deux étapes, l'application vous demandera un code après l'installation."
+      }
+    ]
+  },
+  {
+    "step_title": "Ensuite",
+    "items": [
+      {
+        "desc": "Après l'installation, ouvrez <b>Synology MCP</b> depuis le menu principal de DSM pour :<br>• configurer l'accès Internet (règle de proxy inversé et certificat créés automatiquement) ;<br>• choisir les droits de chaque partie (désactivé, lecture seule, lecture et écriture) et les comptes autorisés ;<br>• récupérer l'adresse à donner à Claude, suivre les sessions et le journal des actions."
+      }
+    ]
+  }
+]

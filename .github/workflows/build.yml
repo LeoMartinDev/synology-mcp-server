@@ -1,6 +1,7 @@
-name: Image
+name: Build
 
-# Tests, then builds and publishes ghcr.io/<owner>/synology-mcp-server: `latest` from main, `x.y.z` from v* tags.
+# Tests, then builds the Synology package (.spk, a workflow artifact; attached to the release for v* tags)
+# and publishes ghcr.io/<owner>/synology-mcp-server: `latest` from main, `x.y.z` from v* tags.
 on:
   push:
     branches: [main]
@@ -23,6 +24,31 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun test
+
+  package:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+      # The DS718+'s Celeron has no AVX2: the baseline build runs on every x86-64 NAS.
+      - run: bun build --compile --minify --target=bun-linux-x64-baseline src/index.ts --outfile dist/synology-mcp
+      - run: bun run scripts/build-spk.ts dist/synology-mcp dist/spk
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: synology-mcp-spk
+          path: dist/spk/*.spk
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/spk/*.spk
 
   image:
     needs: test

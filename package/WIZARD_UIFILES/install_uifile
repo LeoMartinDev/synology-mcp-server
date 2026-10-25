@@ -1,0 +1,64 @@
+[
+  {
+    "step_title": "Service account",
+    "items": [
+      {
+        "desc": "Synology MCP lets Claude (claude.ai, Claude Code) manage this NAS. It acts on DSM with a dedicated account in the <b>administrators</b> group: create it first in Control Panel → User & Group if needed. What Claude may do is then set part by part in the app."
+      },
+      {
+        "type": "combobox",
+        "desc": "DSM account the server acts with:",
+        "subitems": [
+          {
+            "key": "wizard_username",
+            "desc": "Account",
+            "displayField": "name",
+            "valueField": "name",
+            "editable": true,
+            "mode": "remote",
+            "api_store": {
+              "api": "SYNO.Core.User",
+              "method": "list",
+              "version": 1,
+              "baseParams": {
+                "offset": 0,
+                "limit": -1
+              },
+              "root": "users",
+              "idProperty": "name",
+              "fields": [
+                "name"
+              ]
+            },
+            "validator": {
+              "allowBlank": false
+            }
+          }
+        ]
+      },
+      {
+        "type": "password",
+        "subitems": [
+          {
+            "key": "wizard_password",
+            "desc": "Password",
+            "validator": {
+              "allowBlank": false
+            }
+          }
+        ]
+      },
+      {
+        "desc": "If this account uses 2-step verification, the app will ask for a code after the installation."
+      }
+    ]
+  },
+  {
+    "step_title": "Next steps",
+    "items": [
+      {
+        "desc": "After the installation, open <b>Synology MCP</b> from the DSM main menu to:<br>• set up Internet access (reverse proxy rule and certificate configured automatically);<br>• choose the rights of each part (off, read-only, read-write) and the allowed accounts;<br>• get the address to give Claude, follow the sessions and the action log."
+      }
+    ]
+  }
+]

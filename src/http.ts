@@ -14,6 +14,7 @@ import type { PermissionsSource } from "./permissions";
 import type { SynologyClient } from "./synology/client";
 import { registerAllTools } from "./tools";
 import { type AuditLog, Toolbox } from "./tools/toolbox";
+import { VERSION } from "./version";
 
 export interface HttpApp {
   fetch(request: Request, socketIp: string): Promise<Response>;
@@ -61,7 +62,7 @@ export function createHttpApp(
   const mcp = createMcpHandler(
     async ({ authInfo }) => {
       const user = principal(authInfo);
-      const server = new McpServer({ name: "synology", version: "0.3.0" }, { capabilities: { tools: {} } });
+      const server = new McpServer({ name: "synology", version: VERSION }, { capabilities: { tools: {} } });
       const { domains } = await permissions.load();
       registerAllTools(new Toolbox({ server, client, permissions: domains, audit, user }));
       return server;
@@ -79,7 +80,8 @@ export function createHttpApp(
     authorizationServer,
     async fetch(request, socketIp) {
       const { pathname } = new URL(request.url);
-      if (pathname === "/health") return new Response("ok");
+      // Readable from any origin: the DSM app checks the public address answers.
+      if (pathname === "/health") return new Response("ok", { headers: { "access-control-allow-origin": "*" } });
 
       const metadata = oauthMetadataResponse(request, metadataOptions);
       if (metadata) return metadata;
@@ -103,12 +105,17 @@ function principal(authInfo: AuthInfo | undefined): string {
   return user;
 }
 
+export interface RunningHttpServer {
+  store: OAuthStore;
+  stop(): Promise<void>;
+}
+
 export async function serveHttp(
   config: Config,
   client: SynologyClient,
   audit: AuditLog,
   permissions: PermissionsSource,
-): Promise<void> {
+): Promise<RunningHttpServer> {
   const store = await OAuthStore.open(config.dataDir);
   const app = createHttpApp(config, client, audit, store, permissions);
   const server = Bun.serve({
@@ -127,4 +134,11 @@ export async function serveHttp(
   console.error(
     `[synology] ${config.url} — OAuth MCP server on ${server.url} (public: ${config.http.publicUrl}/mcp), rights from ${permissions.path}`,
   );
+  return {
+    store,
+    async stop() {
+      await server.stop(true);
+      await store.save();
+    },
+  };
 }

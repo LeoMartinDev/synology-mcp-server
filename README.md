@@ -4,15 +4,17 @@ Serveur MCP (Bun + TypeScript) qui permet à un agent de gérer un NAS Synology 
 état du système et du stockage, paquets, conteneurs (Container Manager), fichiers (File Station),
 dossiers partagés, permissions, utilisateurs et groupes.
 
-Deux façons de l'utiliser :
+Trois façons de l'utiliser :
 
-- **sur le NAS** (recommandé) : un conteneur installé depuis Container Manager, partagé entre Claude Code,
-  claude.ai et l'app mobile, qui se connectent avec leur compte DSM (OAuth) ;
+- **paquet Synology** (recommandé) : installé depuis le Centre de paquets, réglé depuis sa fenêtre dans DSM, partagé
+  entre Claude Code, claude.ai et l'app mobile, qui se connectent avec leur compte DSM (OAuth) ;
+- **conteneur** : le même serveur dans Container Manager, réglé à la main ;
 - **en local** : Claude Code lance le serveur sur le PC (stdio), qui parle au NAS par le réseau.
 
 ## Permissions
 
-Ce que le serveur peut faire se règle dans `permissions.yml`, une ligne par partie du serveur :
+Ce que le serveur peut faire se règle par partie : dans l'onglet **Droits** de l'application avec le paquet, ou dans
+`permissions.yml` (que l'application écrit aussi), une ligne par partie du serveur :
 
 ```yaml
 system: ro       # état, ressources, mises à jour, journaux, connexions, redémarrage/arrêt
@@ -57,10 +59,43 @@ cp .env.example .env              # SYNO_URL, SYNO_USERNAME, SYNO_PASSWORD
 bun run device-token 123456       # code 2FA du moment → affiche SYNO_DEVICE_ID
 ```
 
-## Installer sur le NAS (Container Manager)
+## Installer le paquet Synology (recommandé)
+
+```
+claude.ai / Claude Code ──HTTPS + jeton OAuth──▶ proxy inversé DSM ──▶ Synology MCP ──API Web──▶ DSM
+                                                 (certificat Let's Encrypt)  (127.0.0.1)   (compte de service)
+```
+
+Le paquet `SynologyMCP-<version>-x86_64.spk` est construit par GitHub (`.github/workflows/build.yml` : artefact de
+chaque build, joint aux releases `v*`), ou en local avec `bun run spk`. DSM 7.2 ou plus, processeur x86-64.
+
+1. **Compte de service** : créer un compte DSM dédié (par exemple `MCP`), membre du groupe *administrators*.
+2. **Autoriser les paquets non signés** : Centre de paquets → Paramètres → Général → Niveau de confiance :
+   « Synology Inc. et éditeurs de confiance » ne suffit pas, choisir « N'importe quel éditeur ».
+3. **Installer** : Centre de paquets → Installation manuelle → choisir le `.spk`. L'assistant demande le compte de
+   service (liste des comptes DSM) et son mot de passe.
+4. **Ouvrir Synology MCP** depuis le menu principal de DSM :
+   - *Compte de service* : saisir le code de validation en deux étapes si le compte en a une (une seule fois : DSM
+     approuve ensuite l'appareil) ;
+   - *Accès Internet* : choisir le nom d'hôte (par défaut `mcp.<votre DDNS>`), puis **Configurer** : la règle de
+     proxy inversé (en-tête `X-Real-IP`, délais de 300 s) et le certificat qui couvre ce nom sont réglés
+     automatiquement. Le port (443 par défaut) doit être redirigé vers le NAS sur la box ; **Tester** vérifie
+     l'accès ;
+   - *Droits* : off / lecture seule / lecture et écriture par partie, et les comptes autorisés à se connecter ;
+   - *Vue d'ensemble* : l'adresse à donner à Claude et la commande pour Claude Code ;
+   - *Sessions* et *Journal* : les connexions en cours (révocables) et les actions faites sur le NAS.
+
+Le paquet tourne sous son propre utilisateur DSM, sans droits root. Ses données (`settings.json` avec le mot de passe
+du compte de service, `permissions.yml`, `oauth.json`, `audit.log`, `synology-mcp.log`) sont dans
+`/var/packages/SynologyMCP/var`, lisible par le paquet seul. La fenêtre passe par le serveur web de DSM
+(`/synology-mcp/api/`) et n'est accessible qu'aux administrateurs DSM connectés.
+
+**Mettre à jour** : installer le nouveau `.spk` de la même façon ; les réglages sont conservés.
+
+## Autre méthode : conteneur (Container Manager)
 
 L'image `ghcr.io/leomartindev/synology-mcp-server` est construite et publiée par GitHub à chaque modification
-(`.github/workflows/image.yml`). Elle tourne aussi sur les processeurs sans AVX2 (Celeron J3455 du DS718+…).
+(`.github/workflows/build.yml`). Elle tourne aussi sur les processeurs sans AVX2 (Celeron J3455 du DS718+…).
 
 ```
 claude.ai / Claude Code ──HTTPS + jeton OAuth──▶ proxy inversé DSM ──▶ conteneur synology-mcp ──API Web──▶ DSM
@@ -116,7 +151,7 @@ heure après). **Tout révoquer** : supprimer `data/oauth.json` et redémarrer l
   limitées à 5 échecs par IP ou par compte en 15 min, 5 tentatives par demande et 8 échecs au total en 5 min
   (`SYNO_SIGNIN_GLOBAL_LIMIT`) ; tailles bornées pour tout ce qu'une requête anonyme peut faire stocker.
 
-DSM voit toutes les connexions venir du conteneur : si son blocage automatique bloquait cette adresse, le compte de
+DSM voit toutes les connexions venir du serveur (du conteneur, ou de 127.0.0.1 avec le paquet) : si son blocage automatique bloquait cette adresse, le compte de
 service serait bloqué aussi, et tout le serveur avec. La limite globale reste donc sous son seuil (10 échecs en
 5 min par défaut), au prix d'un blocage de quelques minutes pour tout le monde en cas d'attaque. Une fois le
 sous-réseau Docker sur la liste d'autorisation de DSM (étape 3), `SYNO_SIGNIN_GLOBAL_LIMIT: "0"` lève cette limite ;

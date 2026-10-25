@@ -17,9 +17,9 @@ import { hashToken, newToken, safeEqual, verifyPkce } from "./tokens";
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 const ACCESS_TTL = 60 * MINUTE;
-const REFRESH_TTL = 30 * DAY;
+export const REFRESH_TTL = 30 * DAY;
 /** However often it is refreshed, a sign-in ends after this: people sign in again with DSM (and 2FA). */
-const FAMILY_TTL = 90 * DAY;
+export const FAMILY_TTL = 90 * DAY;
 const CODE_TTL = MINUTE;
 const PENDING_TTL = 10 * MINUTE;
 /** A refresh token presented again within this delay is refused without revoking its family (client retries). */

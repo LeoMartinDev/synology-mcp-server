@@ -96,10 +96,14 @@ export function fakeNas(routes: Record<string, Route> = {}, apis = DEFAULT_APIS,
       const user = users[params.get("account") ?? ""];
       if (user) {
         loginParams.push(params);
+        // A device token from an earlier 2FA login replaces the code.
+        const trusted = params.get("device_id") === `device-${params.get("account")}`;
+        const needsOtp = user.otp && !trusted;
         const code =
-          params.get("passwd") !== user.password ? 400 : user.otp && !params.get("otp_code") ? 403 : user.otp && params.get("otp_code") !== user.otp ? 404 : 0;
+          params.get("passwd") !== user.password ? 400 : needsOtp && !params.get("otp_code") ? 403 : needsOtp && params.get("otp_code") !== user.otp ? 404 : 0;
         if (code) return Response.json({ success: false, error: { code } });
-        return Response.json({ success: true, data: { sid: `user-sid-${params.get("account")}` } });
+        const did = params.get("enable_device_token") === "yes" ? { device_id: `device-${params.get("account")}` } : {};
+        return Response.json({ success: true, data: { sid: `user-sid-${params.get("account")}`, ...did } });
       }
       logins++;
       loginParams.push(params);

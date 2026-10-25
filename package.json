@@ -1,6 +1,6 @@
 {
   "name": "synology-mcp-server",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "MCP server to manage a Synology NAS, locally (stdio) or remotely with OAuth (HTTP)",
   "module": "src/index.ts",
   "type": "module",
@@ -10,7 +10,8 @@
     "test": "bun test",
     "typecheck": "bun check",
     "smoke": "bun run scripts/smoke.ts",
-    "device-token": "bun run scripts/device-token.ts"
+    "device-token": "bun run scripts/device-token.ts",
+    "spk": "bun build --compile --minify --target=bun-linux-x64-baseline src/index.ts --outfile dist/synology-mcp && bun run scripts/build-spk.ts dist/synology-mcp"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.4.0",

@@ -1,0 +1,7 @@
+#!/bin/sh
+# Saves the service account chosen in the install wizard (wizard_* variables). What `setup` prints is
+# shown at the end of the installation.
+if [ -n "${wizard_username}" ]; then
+    SYNO_DATA_DIR="${SYNOPKG_PKGVAR}" "${SYNOPKG_PKGDEST}/bin/synology-mcp" setup > "${SYNOPKG_TEMP_LOGFILE}" 2>/dev/null
+fi
+exit 0

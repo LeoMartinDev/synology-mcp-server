@@ -1,4 +1,4 @@
-import { chmod, mkdir, stat } from "node:fs/promises";
+import { chmod, mkdir, rename, stat } from "node:fs/promises";
 import { dirname } from "node:path";
 import { z } from "zod";
 
@@ -23,27 +23,43 @@ const FileSchema = z
   })
   .strict();
 
-/** Written on first start: everything readable, nothing writable. */
-export const DEFAULT_PERMISSIONS_FILE = `# Droits du serveur MCP sur chaque partie du NAS, relus à chaque requête (pas besoin de redémarrer).
+/** What each part covers, written next to its line in the file. */
+export const DOMAIN_DESCRIPTIONS: Record<Domain, string> = {
+  system: "état, ressources, mises à jour, journaux, connexions, redémarrage/arrêt",
+  storage: "volumes, groupes de stockage, disques",
+  packages: "paquets DSM : lister, démarrer/arrêter, désinstaller",
+  containers: "Container Manager : conteneurs, journaux, images, projets",
+  files: "File Station : parcourir, chercher, lire/écrire, copier/déplacer, supprimer",
+  shares: "dossiers partagés et leurs permissions",
+  users: "utilisateurs et groupes DSM",
+  discovery: "appels directs à l'API DSM (ro : méthodes de lecture seulement)",
+};
+
+/** The permissions file for these rights, with its explanations (the DSM app rewrites it this way). */
+export function formatPermissions({ domains, allowedUsers }: Permissions): string {
+  const width = Math.max(...DOMAINS.map((d) => d.length)) + 6;
+  const lines = DOMAINS.map((d) => `${`${d}: ${domains[d]}`.padEnd(width)}# ${DOMAIN_DESCRIPTIONS[d]}`);
+  const users = allowedUsers?.length
+    ? ["allowed_users:", ...allowedUsers.map((u) => `  - ${JSON.stringify(u)}`)]
+    : ["# allowed_users:", "#   - leo"];
+  return `# Droits du serveur MCP sur chaque partie du NAS, relus à chaque requête (pas besoin de redémarrer).
 #   off : aucun outil
 #   ro  : lecture seule
 #   rw  : tout, y compris supprimer, désinstaller, redémarrer ou éteindre le NAS
 # Une partie absente vaut off.
 
-system: ro       # état, ressources, mises à jour, journaux, connexions, redémarrage/arrêt
-storage: ro      # volumes, groupes de stockage, disques
-packages: ro     # paquets DSM : lister, démarrer/arrêter, désinstaller
-containers: ro   # Container Manager : conteneurs, journaux, images, projets
-files: ro        # File Station : parcourir, chercher, lire/écrire, copier/déplacer, supprimer
-shares: ro       # dossiers partagés et leurs permissions
-users: ro        # utilisateurs et groupes DSM
-discovery: ro    # appels directs à l'API DSM (ro : méthodes de lecture seulement)
+${lines.join("\n")}
 
 # Comptes DSM autorisés à se connecter par OAuth (serveur distant). Sans cette liste,
 # tout compte DSM actif peut se connecter, avec les droits ci-dessus.
-# allowed_users:
-#   - leo
+${users.join("\n")}
 `;
+}
+
+/** Written on first start: everything readable, nothing writable. */
+export const DEFAULT_PERMISSIONS_FILE = formatPermissions({
+  domains: Object.fromEntries(DOMAINS.map((d) => [d, "ro"])) as Record<Domain, Permission>,
+});
 
 export function parsePermissions(text: string): Permissions {
   let raw: unknown;
@@ -95,6 +111,13 @@ export class PermissionsFile implements PermissionsSource {
     } catch (err) {
       throw new Error(`${this.path}: ${(err as Error).message}`);
     }
+  }
+
+  /** Replaces the file (from the DSM app); the next load picks the new rights up. */
+  async save(permissions: Permissions): Promise<void> {
+    const tmp = `${this.path}.tmp`;
+    await Bun.write(tmp, formatPermissions(permissions));
+    await rename(tmp, this.path);
   }
 
   async load(): Promise<Permissions> {

@@ -1,0 +1,48 @@
+#!/bin/sh
+# Starts and stops the Synology MCP daemon (DSM runs this script as the package's own user).
+
+BIN="${SYNOPKG_PKGDEST}/bin/synology-mcp"
+VAR="${SYNOPKG_PKGVAR:-/var/packages/SynologyMCP/var}"
+PID_FILE="${VAR}/synology-mcp.pid"
+LOG_FILE="${VAR}/synology-mcp.log"
+LOG_MAX_BYTES=5242880
+
+is_running() {
+    [ -f "${PID_FILE}" ] && kill -0 "$(cat "${PID_FILE}")" 2>/dev/null
+}
+
+case "$1" in
+    start)
+        is_running && exit 0
+        if [ -f "${LOG_FILE}" ] && [ "$(wc -c < "${LOG_FILE}")" -gt "${LOG_MAX_BYTES}" ]; then
+            mv -f "${LOG_FILE}" "${LOG_FILE}.1"
+        fi
+        SYNO_DATA_DIR="${VAR}" nohup "${BIN}" package >> "${LOG_FILE}" 2>&1 &
+        echo $! > "${PID_FILE}"
+        sleep 1
+        is_running || { echo "Synology MCP n'a pas pu démarrer : voir ${LOG_FILE}" > "${SYNOPKG_TEMP_LOGFILE:-/dev/null}"; exit 1; }
+        exit 0
+        ;;
+    stop)
+        if is_running; then
+            PID="$(cat "${PID_FILE}")"
+            kill "${PID}"
+            for _ in 1 2 3 4 5 6 7 8 9 10; do
+                kill -0 "${PID}" 2>/dev/null || break
+                sleep 1
+            done
+            kill -9 "${PID}" 2>/dev/null
+        fi
+        rm -f "${PID_FILE}"
+        exit 0
+        ;;
+    status)
+        is_running && exit 0
+        exit 3
+        ;;
+    log)
+        echo "${LOG_FILE}"
+        exit 0
+        ;;
+esac
+exit 0

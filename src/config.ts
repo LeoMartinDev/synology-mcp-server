@@ -36,6 +36,16 @@ const list = (fallback: string[]) =>
     .optional()
     .transform((v) => (v === undefined ? fallback : v.split(",").map((s) => s.trim()).filter(Boolean)));
 
+/** The public address of the HTTP server: an origin (OAuth discovery lives at the root), https unless local. */
+export const PublicUrlSchema = z
+  .url({ protocol: /^https?$/ })
+  .refine((u) => new URL(u).pathname === "/", "must be an origin without a path, e.g. https://nas.example.com:8443")
+  .refine((u) => {
+    const { protocol, hostname } = new URL(u);
+    return protocol === "https:" || hostname === "localhost" || hostname === "127.0.0.1";
+  }, "must use https (plain http is only accepted for localhost, to try the server out)")
+  .transform((u) => u.replace(/\/+$/, ""));
+
 const EnvSchema = z.object({
   SYNO_URL: z.url().transform((u) => u.replace(/\/+$/, "")),
   SYNO_USERNAME: z.string({ error: "set SYNO_USERNAME or SYNO_USERNAME_COMMAND" }).min(1),
@@ -53,18 +63,9 @@ const EnvSchema = z.object({
   SYNO_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
   SYNO_DEBUG: flag(false),
   SYNO_TRANSPORT: z.enum(["stdio", "http"]).default("stdio"),
-  SYNO_PUBLIC_URL: z
-    .url({ protocol: /^https?$/ })
-    // OAuth discovery documents live at the root of the host (/.well-known/…).
-    .refine((u) => new URL(u).pathname === "/", "must be an origin without a path, e.g. https://nas.example.com:8443")
-    .refine((u) => {
-      const { protocol, hostname } = new URL(u);
-      return protocol === "https:" || hostname === "localhost" || hostname === "127.0.0.1";
-    }, "must use https (plain http is only accepted for localhost, to try the server out)")
-    .transform((u) => u.replace(/\/+$/, ""))
-    .optional(),
+  SYNO_PUBLIC_URL: PublicUrlSchema.optional(),
   SYNO_HTTP_HOST: z.string().default("0.0.0.0"),
-  SYNO_HTTP_PORT: z.coerce.number().int().min(1).max(65535).default(8080),
+  SYNO_HTTP_PORT: z.coerce.number().int().min(0).max(65535).default(8080), // 0: any free port (tests)
   SYNO_DATA_DIR: z.string().default(DEFAULT_DATA_DIR),
   SYNO_PERMISSIONS_FILE: z.string().optional(),
   SYNO_OAUTH_REDIRECT_URIS: list(DEFAULT_REDIRECT_URIS),

@@ -14,7 +14,8 @@ export class SignInError extends Error {
   }
 }
 
-const SIGN_IN_ERRORS: Record<number, string> = {
+/** What a refused DSM login means, in words for the person who tried. */
+export const SIGN_IN_ERRORS: Record<number, string> = {
   400: "Identifiant ou mot de passe incorrect.",
   401: "Ce compte est désactivé.",
   402: "Ce compte n'a pas le droit de se connecter à DSM.",

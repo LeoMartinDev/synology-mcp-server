@@ -156,6 +156,11 @@ export class SynologyClient {
     return this.withSession(() => this.request<T>(api, method, params, { ...options, file }));
   }
 
+  /** Logs in now rather than at the first call, to check the account works. */
+  async connect(): Promise<void> {
+    await this.ensureSession();
+  }
+
   /** Logs in with a one-time 2FA code and returns a device token that skips 2FA on later logins. */
   async loginWithOtp(otpCode: string): Promise<string> {
     const data = await this.login({ otp_code: otpCode, enable_device_token: "yes" });
